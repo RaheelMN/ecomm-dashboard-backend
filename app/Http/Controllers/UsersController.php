@@ -7,8 +7,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-
 use function PHPUnit\Framework\isEmpty;
+use Illuminate\Support\Facades\Validator;
+
 
 class UsersController extends Controller
 {
@@ -22,82 +23,64 @@ class UsersController extends Controller
 
     public function login(Request $req){
         $user = User::where('email',$req->email)->first();
-        if(!$user || !Hash::check($req->password,$user->password)){
-            return ['error'=>'name or password not matched'];
-        }else
-        return $user;
-        // $input = $req->input();
-        // $result=db::select('SELECT * FROM users where `name`=?',[$input['name']]);
-        // if($result){
-        //     return response(json_encode($result),200)
-        //     ->header('Content-Type','application/json')
-        //     ->header('Access-Control-Allow-Origin','*');        
-        // }
-        // else{
-        //     return response(json_encode(['message'=>'result not found']),200)
-        //     ->header('Content-Type','application/json')
-        //     ->header('Access-Control-Allow-Origin','*');                         
-        // }
+        $output = [];
+        $output['error']=false;
+        if(!$user){
+            $output['error']=true;
+            $output['email_err']="Email not found";
+            return $output;
+        }elseif(!Hash::check($req->password,$user->password)){
+            $output['error']=true;
+            $output['pass_err']="password not match";
+            return $output;
+        }else{
+            $output['data']=$user;
+            return $output;
+        }
     }
 
     public function register(Request $req){
-
+        $output=[];
+        $output['error']=false;
         $user = new User;
-        $user->name = $req->input('name');
-        $user->email = $req->input('email');
-        $user->password = Hash::make($req->input('password'));
-        $user->save();
+        
+        $rules=array(
+            'name'=>'required|regex:/^[\pL\s\.]+$/u|max:50',
+            'email'=>'required|email|unique:App\Models\User,email|max:255',
+            'password'=>'required|between:6,6'
+        );
+        $messages=array(
+          'name.required'=>'Enter name',
+          'name.regex'=>'Name should be alphabets',
+          'name.max'=>'Name should be less then 50 characters',
+          'email.required'=>'enter email',
+          'email.email'=>'Email format not valid',
+          'email.unique'=>'Email already exists',
+          'email.max'=>'Email should be less then 255 characters',
+          'password.required'=>'enter password',
+          'password.between'=>'Password should be six characters',
+        );
 
-        return response(json_encode($user))
-        ->header('Content-Type','application/json')
-        ->header('Access-Control-Allow-Origin','*');
+        $validator=Validator::make($req->all(),$rules,$messages);
+        if($validator->fails())
+        {
+            $output['error']=true;
+            $output['data']=$validator->messages();
+            return $output;
+        }else{
 
+            $user->name= $req->name;
+            $user->email= $req->email;
+            $user->password= $req->password;
+            $result = $user->save();
+            if($result){
 
-        // return $user;
-        // $data =['name'=>$req->name,'email'=>$req->email,'password'=>$req->password ];
-        // $result = db::table('users')->insertOrIgnore($data);
-        // if($result){
-        //     echo "data inserted sussfully";
-        // }else{
-        //     echo "email already exists"; 
-        // }
- 
-        // $data =['name'=>$req->name,'age'=>$req->age,'email'=>$req->email,'city'=>$req->city ];
-        // $result=db::table('students')->insertOrIgnore($data);
-
-        // $result = db::insert('INSERT INTO students (`name`,`age`,`email`,`city`) VALUES (?,?,?,?)',[$req->name,$req->age,$req->email,$req->city]);
-        // if($result==1){
-        //     return redirect()->route('showStudents');
-        // }else{  
-
-        // $validate=$req->validate([
-        //     'name'=>'required|alpha|max:50',
-        //     'email'=>'required|email|max:255',
-        //     'password'=>'required|between:6,6'
-        // ],['name.required'=>'Enter name',
-        //   'email.required'=>'enter email',
-        //   'password.required'=>'enter password']);
-
+                $output['data']=$user;
+                $output['data']['id']=$user->id;
+                return $output;
+            }
+        }
     }
-
-        // public function addStudent(Request $req){
-        // $req->validate([
-        //     'name'=>'required|alpha|max:20',
-        //     'email'=>'email|max:255|unique:App\Models\student,email',
-        //     'age'=>'numeric|between:18,24',
-        //     'city'=>'numeric|min:1'
-        // ],['name.required'=>'Please enter the name',
-        //     'name.alpha'=>'Name should consist of letters',
-        //     'city.min'=>'Select one of the city in dropdown menu']);
-        // // $data =['name'=>$req->name,'age'=>$req->age,'email'=>$req->email,'city'=>$req->city ];
-        // // $result=db::table('students')->insertOrIgnore($data);
-
-        // $result = db::insert('INSERT INTO students (`name`,`age`,`email`,`city`) VALUES (?,?,?,?)',[$req->name,$req->age,$req->email,$req->city]);
-        // if($result==1){
-        //     return redirect()->route('showStudents');
-        // }else{
-        //     echo 'Email already exists';
-        // }
 }
 
 
